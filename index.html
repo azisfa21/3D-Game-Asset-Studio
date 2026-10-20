@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Game Asset Studio</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Three.js Core & Addons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow: hidden;
+            user-select: none;
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        /* Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -4px;
+            box-shadow: 0 0 5px rgba(56, 189, 248, 0.5);
+        }
+        .tool-btn.active {
+            background-color: #0284c7;
+            color: white;
+            border-color: #38bdf8;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+        }
+        #canvas-container canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+            outline: none;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col bg-slate-950 text-slate-200">
+
+    <!-- Top Navbar -->
+    <header class="h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between z-20 shrink-0">
+        <!-- Brand -->
+        <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <i class="fa-solid fa-cubes text-white text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-sm tracking-wide text-white flex items-center gap-2">
+                    POLYFORGE 3D
+                    <span class="text-[10px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded font-medium">STUDIO</span>
+                </h1>
+                <p class="text-[11px] text-slate-400 hidden sm:block">Pembuat Aset Gim 3D Interaktif</p>
+            </div>
+        </div>
+
+        <!-- Transform & View Tools -->
+        <div class="flex items-center space-x-1 sm:space-x-2 bg-slate-950 p-1 rounded-lg border border-slate-800">
+            <button id="btn-translate" onclick="setTransformMode('translate')" class="tool-btn active px-2.5 py-1.5 rounded text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1.5 border border-transparent" title="Geser (Shortcut: G / W)">
+                <i class="fa-solid fa-arrows-up-down-left-right"></i>
+                <span class="hidden md:inline">Geser</span>
+            </button>
+            <button id="btn-rotate" onclick="setTransformMode('rotate')" class="tool-btn px-2.5 py-1.5 rounded text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1.5 border border-transparent" title="Putar (Shortcut: R / E)">
+                <i class="fa-solid fa-rotate"></i>
+                <span class="hidden md:inline">Putar</span>
+            </button>
+            <button id="btn-scale" onclick="setTransformMode('scale')" class="tool-btn px-2.5 py-1.5 rounded text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1.5 border border-transparent" title="Skala (Shortcut: S)">
+                <i class="fa-solid fa-expand"></i>
+                <span class="hidden md:inline">Skala</span>
+            </button>
+            <div class="h-4 w-[1px] bg-slate-800 mx-1"></div>
+            <button id="btn-snap" onclick="toggleSnap()" class="tool-btn px-2.5 py-1.5 rounded text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1.5 border border-transparent" title="Snap ke Grid">
+                <i class="fa-solid fa-magnet"></i>
+                <span class="hidden lg:inline">Snap</span>
+            </button>
+            <button id="btn-wireframe" onclick="toggleGlobalWireframe()" class="tool-btn px-2.5 py-1.5 rounded text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1.5 border border-transparent" title="Mode Kerangka (Wireframe)">
+                <i class="fa-solid fa-border-all"></i>
+            </button>
+        </div>
+
+        <!-- Export & Action Buttons -->
+        <div class="flex items-center space-x-2">
+            <button onclick="clearSceneConfirm()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-400 border border-slate-700 hover:border-rose-800 transition flex items-center gap-1.5" title="Bersihkan Kanvas">
+                <i class="fa-solid fa-trash-can"></i>
+                <span class="hidden sm:inline">Reset</span>
+            </button>
+            <div class="relative group">
+                <button onclick="exportOBJ()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/20 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Ekspor .OBJ</span>
+                </button>
+            </div>
+            <button onclick="exportJSON()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1" title="Simpan Proyek (.JSON)">
+                <i class="fa-solid fa-file-code text-cyan-400"></i>
+                <span class="hidden lg:inline">.JSON</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex overflow-hidden relative">
+        
+        <!-- Left Sidebar: AI Generator, Primitives, Presets, and Hierarchy -->
+        <aside class="w-64 sm:w-72 bg-slate-900 border-r border-slate-800 flex flex-col z-10 shrink-0 select-none overflow-y-auto">
+            
+            <!-- Section: AI Pembuat Karakter & Aset 3D -->
+            <div class="p-3.5 border-b border-slate-800 bg-gradient-to-b from-cyan-950/30 to-transparent">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> AI Generator 3D
+                    </h2>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-semibold">GEMINI AI</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mb-2 leading-relaxed">Deskripsikan karakter atau objek gim yang ingin dibuat secara otomatis:</p>
+                
+                <textarea id="ai-prompt" rows="2" class="w-full bg-slate-950/90 border border-slate-700/80 focus:border-cyan-400 rounded-lg p-2 text-xs text-slate-100 placeholder-slate-500 outline-none resize-none transition" placeholder="Cth: Ksatria baja dengan perisai emas dan pedang neon biru..."></textarea>
+                
+                <!-- Quick Prompt Chips -->
+                <div class="flex flex-wrap gap-1 mt-1.5 mb-2.5">
+                    <button onclick="setAIPrompt('Karakter Ninja hitam dengan mata menyala merah dan katana di punggung')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">🥷 Ninja</button>
+                    <button onclick="setAIPrompt('Monster Slime hijau lucu memakai mahkota raja emas')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">👑 Raja Slime</button>
+                    <button onclick="setAIPrompt('Penyihir berjubah ungu memakai topi kerucut besar dan tongkat kristal')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">🧙‍♂️ Penyihir</button>
+                    <button onclick="setAIPrompt('Mecha Robot tempur raksasa warna merah emas dengan meriam bahu')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">🤖 Mecha</button>
+                </div>
+
+                <div class="flex items-center justify-between mb-2.5 text-[11px] text-slate-400">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input id="ai-clear-existing" type="checkbox" checked class="w-3.5 h-3.5 accent-cyan-500 rounded cursor-pointer">
+                        <span>Ganti objek di kanvas</span>
+                    </label>
+                </div>
+
+                <button id="btn-ai-generate" onclick="generateWithAI()" class="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/20 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i id="ai-btn-icon" class="fa-solid fa-bolt"></i>
+                    <span id="ai-btn-text">Buat Karakter / Aset AI</span>
+                </button>
+            </div>
+
+            <!-- Section: Bentuk Dasar (Primitives) -->
+            <div class="p-3.5 border-b border-slate-800">
+                <div class="flex items-center justify-between mb-2.5">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-shapes text-cyan-400"></i> Tambah Bentuk
+                    </h2>
+                    <span class="text-[10px] text-slate-500">Klik untuk tambah</span>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="addPrimitive('box')" class="flex flex-col items-center justify-center p-2.5 rounded-lg bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-cyan-500/50 transition group">
+                        <i class="fa-solid fa-cube text-lg text-slate-300 group-hover:text-cyan-400 group-hover:scale-110 transition"></i>
+                        <span class="text-[11px] mt-1.5 text-slate-300 font-medium">Kubus</span>
+                    </button>
+                    <button onclick="addPrimitive('sphere')" class="flex flex-col items-center justify-center p-2.5 rounded-lg bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-cyan-500/50 transition group">
+                        <i class="fa-solid fa-circle text-lg text-slate-300 group-hover:text-cyan-400 group-hover:scale-110 transition"></i>
+                        <span class="text-[11px] mt-1.5 text-slate-300 font-medium">Bola</span>
+                    </button>
+                    <button onclick="addPrimitive('cylinder')" class="flex flex-col items-center justify-center p-2.5 rounded-lg bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-cyan-500/50 transition group">
+                        <i class="fa-solid fa-database text-lg text-slate-300 group-hover:text-cyan-400 group-hover:scale-110 transition"></i>
+                        <span class="text-[11px] mt-1.5 text-slate-300 font-medium">Silinder</span>
+                    </button>
+                    <button onclick="addPrimitive('cone')" class="flex flex-col items-center justify-center p-2.5 rounded-lg bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-cyan-500/50 transition group">
+                        <i class="fa-solid fa-caret-up text-xl text-slate-300 group-hover:text-cyan-400 group-hover:scale-110 transition"></i>
+                        <span class="text-[11px] mt-1 text-slate-300 font-medium">Kerucut</span>
+                    </button>
+                    <button onclick="addPrimitive('torus')" class="flex flex-col items-center justify-center p-2.5 rounded-lg bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-cyan-500/50 transition group">
+                        <i class="fa-regular fa-circle-dot text-lg text-slate-300 group-hover:text-cyan-400 group-hover:scale-110 transition"></i>
+                        <span class="text-[11px] mt-1.5 text-slate-300 font-medium">Cincin</span>
+                    </button>
+                    <button onclick="addPrimitive('octahedron')" class="flex flex-col items-center justify-center p-2.5 rounded-lg bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-cyan-500/50 transition group">
+                        <i class="fa-solid fa-gem text-lg text-slate-300 group-hover:text-cyan-400 group-hover:scale-110 transition"></i>
+                        <span class="text-[11px] mt-1.5 text-slate-300 font-medium">Kristal</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Section: Preset Aset Gim (Game Asset Templates) -->
+            <div class="p-3.5 border-b border-slate-800">
+                <div class="flex items-center justify-between mb-2.5">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> Template Aset Gim
+                    </h2>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="loadPreset('sword')" class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-amber-500/40 text-left transition group">
+                        <div class="w-7 h-7 rounded bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:scale-110 transition">
+                            <i class="fa-solid fa-khanda text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-medium text-slate-200">Pedang Ksatria</div>
+                            <div class="text-[10px] text-slate-500">Senjata</div>
+                        </div>
+                    </button>
+                    <button onclick="loadPreset('tree')" class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-emerald-500/40 text-left transition group">
+                        <div class="w-7 h-7 rounded bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition">
+                            <i class="fa-solid fa-tree text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-medium text-slate-200">Pohon Pinus</div>
+                            <div class="text-[10px] text-slate-500">Alam</div>
+                        </div>
+                    </button>
+                    <button onclick="loadPreset('robot')" class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-cyan-500/40 text-left transition group">
+                        <div class="w-7 h-7 rounded bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition">
+                            <i class="fa-solid fa-robot text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-medium text-slate-200">Bot Karakter</div>
+                            <div class="text-[10px] text-slate-500">Karakter</div>
+                        </div>
+                    </button>
+                    <button onclick="loadPreset('chest')" class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-purple-500/40 text-left transition group">
+                        <div class="w-7 h-7 rounded bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 group-hover:scale-110 transition">
+                            <i class="fa-solid fa-treasure-chest fa-box-archive text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-medium text-slate-200">Peti Harta</div>
+                            <div class="text-[10px] text-slate-500">Item Loot</div>
+                        </div>
+                    </button>
+                    <button onclick="loadPreset('potion')" class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-rose-500/40 text-left transition group">
+                        <div class="w-7 h-7 rounded bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 group-hover:scale-110 transition">
+                            <i class="fa-solid fa-flask text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-medium text-slate-200">Ramuan HP</div>
+                            <div class="text-[10px] text-slate-500">Item</div>
+                        </div>
+                    </button>
+                    <button onclick="loadPreset('spaceship')" class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-indigo-500/40 text-left transition group">
+                        <div class="w-7 h-7 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition">
+                            <i class="fa-solid fa-shuttle-space text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-medium text-slate-200">Pesawat Sci-Fi</div>
+                            <div class="text-[10px] text-slate-500">Kendaraan</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Section: Hierarki Objek (Scene Graph) -->
+            <div class="p-3.5 flex-1 flex flex-col min-h-[180px]">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-layer-group text-cyan-400"></i> Daftar Bagian (<span id="part-count">0</span>)
+                    </h2>
+                    <div class="flex gap-1">
+                        <button onclick="duplicateSelected()" class="text-xs px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Duplikat Bagian (Shortcut: D)">
+                            <i class="fa-regular fa-copy"></i>
+                        </button>
+                        <button onclick="deleteSelected()" class="text-xs px-2 py-0.5 rounded bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-300 border border-slate-700 transition" title="Hapus Bagian (Shortcut: Del)">
+                            <i class="fa-regular fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Object List Container -->
+                <div id="hierarchy-list" class="flex-1 bg-slate-950/70 rounded-lg border border-slate-800/80 p-1.5 overflow-y-auto space-y-1 max-h-64">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center: 3D Viewport -->
+        <main class="flex-1 relative bg-slate-950 overflow-hidden flex flex-col">
+            <!-- Top Viewport Overlay: Stats & Camera Preset -->
+            <div class="absolute top-3 left-3 right-3 flex items-start justify-between pointer-events-none z-10">
+                <!-- Polycount & Mesh Info Badge -->
+                <div class="bg-slate-900/85 backdrop-blur-md border border-slate-800 rounded-lg px-3 py-2 text-xs pointer-events-auto shadow-lg flex items-center gap-4">
+                    <div>
+                        <span class="text-slate-400 block text-[10px]">Total Poligon (Tris)</span>
+                        <span id="stat-tris" class="mono font-semibold text-cyan-400">0</span>
+                    </div>
+                    <div class="h-6 w-[1px] bg-slate-800"></div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px]">Titik Sudut (Verts)</span>
+                        <span id="stat-verts" class="mono font-semibold text-emerald-400">0</span>
+                    </div>
+                    <div class="h-6 w-[1px] bg-slate-800 hidden sm:block"></div>
+                    <div class="hidden sm:block">
+                        <span class="text-slate-400 block text-[10px]">Status Rig/Aset</span>
+                        <span class="text-amber-400 font-medium flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Siap Ekspor
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Camera & Game Preview Controls -->
+                <div class="flex flex-col sm:flex-row gap-2 pointer-events-auto">
+                    <div class="bg-slate-900/85 backdrop-blur-md border border-slate-800 rounded-lg p-1 flex items-center gap-1 shadow-lg">
+                        <button onclick="setCameraView('front')" class="px-2 py-1 rounded text-[11px] hover:bg-slate-800 text-slate-300 transition" title="Tampak Depan">Depan</button>
+                        <button onclick="setCameraView('side')" class="px-2 py-1 rounded text-[11px] hover:bg-slate-800 text-slate-300 transition" title="Tampak Samping">Samping</button>
+                        <button onclick="setCameraView('top')" class="px-2 py-1 rounded text-[11px] hover:bg-slate-800 text-slate-300 transition" title="Tampak Atas">Atas</button>
+                        <button onclick="setCameraView('iso')" class="px-2 py-1 rounded text-[11px] bg-slate-800 text-cyan-400 font-medium transition" title="Sudut Perspektif">3D</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3D Canvas Container -->
+            <div id="canvas-container" class="flex-1 w-full h-full relative cursor-crosshair"></div>
+
+            <!-- AI Loading Overlay -->
+            <div id="ai-loading-overlay" class="absolute inset-0 bg-slate-950/75 backdrop-blur-sm hidden flex-col items-center justify-center z-30">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-2xl shadow-cyan-500/40 animate-bounce mb-4">
+                    <i class="fa-solid fa-wand-magic-sparkles text-white text-2xl"></i>
+                </div>
+                <h3 class="text-sm font-bold text-white tracking-wide">AI Sedang Merakit Karakter 3D...</h3>
+                <p id="ai-loading-status" class="text-xs text-cyan-400 mt-1">Merancang anatomi, geometri & material low-poly</p>
+            </div>
+
+            <!-- Bottom Viewport Overlay: Game Animation Preview & Shortcuts -->
+            <div class="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none z-10">
+                <!-- Game Animation Tester -->
+                <div class="bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-xl p-1.5 flex items-center gap-1.5 pointer-events-auto shadow-xl">
+                    <span class="text-[11px] font-semibold text-slate-400 px-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-gamepad text-cyan-400"></i> Uji Animasi Gim:
+                    </span>
+                    <button id="anim-none" onclick="setPreviewAnimation('none')" class="anim-btn active px-2.5 py-1 rounded-lg text-xs font-medium bg-cyan-600 text-white transition">
+                        Diam (Edit)
+                    </button>
+                    <button id="anim-spin" onclick="setPreviewAnimation('spin')" class="anim-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 transition flex items-center gap-1">
+                        <i class="fa-solid fa-arrows-spin text-[10px]"></i> Putar Item
+                    </button>
+                    <button id="anim-float" onclick="setPreviewAnimation('float')" class="anim-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 transition flex items-center gap-1">
+                        <i class="fa-solid fa-water text-[10px]"></i> Melayang
+                    </button>
+                    <button id="anim-bounce" onclick="setPreviewAnimation('bounce')" class="anim-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 transition flex items-center gap-1">
+                        <i class="fa-solid fa-person-running text-[10px]"></i> Lompat
+                    </button>
+                </div>
+
+                <!-- Quick Controls Hint -->
+                <div class="hidden xl:flex bg-slate-900/80 backdrop-blur-md border border-slate-800/80 rounded-lg px-3 py-1.5 text-[11px] text-slate-400 items-center gap-3 pointer-events-auto">
+                    <span><strong class="text-slate-200">Klik Kiri:</strong> Pilih</span>
+                    <span><strong class="text-slate-200">Drag Kiri:</strong> Putar Kamera</span>
+                    <span><strong class="text-slate-200">Drag Kanan:</strong> Geser Kamera</span>
+                    <span><strong class="text-slate-200">Scroll:</strong> Zoom</span>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Sidebar: Inspector (Properties & Material) -->
+        <aside class="w-72 sm:w-80 bg-slate-900 border-l border-slate-800 flex flex-col z-10 shrink-0 select-none overflow-y-auto">
+            
+            <!-- Inspector Header -->
+            <div class="p-3.5 border-b border-slate-800 flex items-center justify-between">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-sliders text-cyan-400"></i> Inspektur Properti
+                </h2>
+                <span id="selected-badge" class="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">
+                    Aktif
+                </span>
+            </div>
+
+            <!-- Empty State when no object is selected -->
+            <div id="inspector-empty" class="hidden p-8 text-center flex-1 flex flex-col items-center justify-center">
+                <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 mb-3">
+                    <i class="fa-solid fa-arrow-pointer text-lg"></i>
+                </div>
+                <p class="text-xs font-medium text-slate-300">Tidak Ada Bagian Dipilih</p>
+                <p class="text-[11px] text-slate-500 mt-1">Klik salah satu objek 3D di layar atau pilih dari daftar di sebelah kiri untuk mengedit bentuk dan warnanya.</p>
+            </div>
+
+            <!-- Active Inspector Content -->
+            <div id="inspector-content" class="flex-1 divide-y divide-slate-800">
+                
+                <!-- Object Name -->
+                <div class="p-3.5 space-y-2">
+                    <label class="text-[11px] font-medium text-slate-400 block">Nama Bagian (Mesh Name)</label>
+                    <div class="flex gap-2">
+                        <input id="inp-name" type="text" onchange="updateObjectName(this.value)" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none transition" placeholder="Nama bagian...">
+                    </div>
+                </div>
+
+                <!-- Transform Coordinates -->
+                <div class="p-3.5 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-300">Transformasi</span>
+                        <button onclick="resetSelectedTransform()" class="text-[11px] text-cyan-400 hover:underline">Reset Posisi</button>
+                    </div>
+
+                    <!-- Position -->
+                    <div class="space-y-1">
+                        <span class="text-[11px] text-slate-400 block">Posisi (X, Y, Z)</span>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <div class="flex items-center bg-slate-950 border border-slate-800 rounded px-2 py-1">
+                                <span class="text-[10px] font-bold text-rose-500 mr-1.5">X</span>
+                                <input id="pos-x" type="number" step="0.1" oninput="updateTransformFromInput()" class="w-full bg-transparent text-xs mono text-right outline-none text-slate-200">
+                            </div>
+                            <div class="flex items-center bg-slate-950 border border-slate-800 rounded px-2 py-1">
+                                <span class="text-[10px] font-bold text-emerald-500 mr-1.5">Y</span>
+                                <input id="pos-y" type="number" step="0.1" oninput="updateTransformFromInput()" class="w-full bg-transparent text-xs mono text-right outline-none text-slate-200">
+                            </div>
+                            <div class="flex items-center bg-slate-950 border border-slate-800 rounded px-2 py-1">
+                                <span class="text-[10px] font-bold text-blue-500 mr-1.5">Z</span>
+                                <input id="pos-z" type="number" step="0.1" oninput="updateTransformFromInput()" class="w-full bg-transparent text-xs mono text-right outline-none text-slate-200">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rotation -->
+                    <div class="space-y-1">
+                        <span class="text-[11px] text-slate-400 block">Rotasi Derajat (X, Y, Z)</span>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <div class="flex items-center bg-slate-950 border border-slate-800 rounded px-2 py-1">
+                                <span class="text-[10px] font-bold text-rose-500 mr-1.5">X</span>
+                                <input id="rot-x" type="number" step="5" oninput="updateTransformFromInput()" class="w-full bg-transparent text-xs mono text-right outline-none text-slate-200">
+                            </div>
+                            <div class="flex items-center bg-slate-950 border border-slate-800 rounded px-2 py-1">
+                                <span class="text-[10px] font-bold text-emerald-500 mr-1.5">Y</span>
+                                <input id="rot-y" type="number" step="5" oninput="updateTransformFromInput()" class="w-full bg-transparent text-xs mono text-right outline-none text-slate-200">
+                            </div>
+                            <div class="flex items-center bg-slate-950 border border-slate-800 rounded px-2 py-1">
+                                <span class="text-[10px] font-bold text-blue-500 mr-1.5">Z</span>
+                                <input id="rot-z" type="number" step="5" oninput="updateTransformFromInput()" class="w-full bg-transparent text-xs mono text-right outline-none text-slate-200">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scale -->
+                    <div class="space-y-1">
+                        <span class="text-[11px] text-slate-400 block">Skala Ukuran (X, Y, Z)</span>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <div class="flex items-center bg-slate-950 border border-slate-800 rounded px-2 py-1">
+                                <span class="text-[10px] font-bold text-rose-500 mr-1.5">X</span>
+                                <input id="scl-x" type="number" step="0.1" min="0.05" oninput="updateTransformFromInput()" class="w-full bg-transparent text-xs mono text-right outline-none text-slate-200">
+                            </div>
+                            <div class="flex items-center bg-slate-950 border border-slate-800 rounded px-2 py-1">
+                                <span class="text-[10px] font-bold text-emerald-500 mr-1.5">Y</span>
+                                <input id="scl-y" type="number" step="0.1" min="0.05" oninput="updateTransformFromInput()" class="w-full bg-transparent text-xs mono text-right outline-none text-slate-200">
+                            </div>
+                            <div class="flex items-center bg-slate-950 border border-slate-800 rounded px-2 py-1">
+                                <span class="text-[10px] font-bold text-blue-500 mr-1.5">Z</span>
+                                <input id="scl-z" type="number" step="0.1" min="0.05" oninput="updateTransformFromInput()" class="w-full bg-transparent text-xs mono text-right outline-none text-slate-200">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Material & Surface Properties -->
+                <div class="p-3.5 space-y-3.5">
+                    <span class="text-xs font-semibold text-slate-300 block">Material & Warna PBR</span>
+                    
+                    <!-- Color Picker & Swatches -->
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[11px] text-slate-400">Warna Utama</label>
+                            <div class="flex items-center gap-2">
+                                <input id="mat-color" type="color" oninput="updateMaterialFromInput()" class="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0">
+                                <span id="mat-color-hex" class="text-xs mono text-slate-300">#38BDF8</span>
+                            </div>
+                        </div>
+                        <!-- Game Color Swatches -->
+                        <div class="grid grid-cols-8 gap-1.5 pt-1">
+                            <button onclick="setQuickColor('#ef4444')" class="w-6 h-6 rounded-md bg-red-500 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#f97316')" class="w-6 h-6 rounded-md bg-orange-500 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#eab308')" class="w-6 h-6 rounded-md bg-yellow-500 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#22c55e')" class="w-6 h-6 rounded-md bg-green-500 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#06b6d4')" class="w-6 h-6 rounded-md bg-cyan-500 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#3b82f6')" class="w-6 h-6 rounded-md bg-blue-500 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#a855f7')" class="w-6 h-6 rounded-md bg-purple-500 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#ec4899')" class="w-6 h-6 rounded-md bg-pink-500 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#f8fafc')" class="w-6 h-6 rounded-md bg-slate-50 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#94a3b8')" class="w-6 h-6 rounded-md bg-slate-400 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#475569')" class="w-6 h-6 rounded-md bg-slate-600 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#1e293b')" class="w-6 h-6 rounded-md bg-slate-800 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#854d0e')" class="w-6 h-6 rounded-md bg-yellow-800 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#5c4033')" class="w-6 h-6 rounded-md bg-[#5c4033] hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#fcd34d')" class="w-6 h-6 rounded-md bg-amber-300 hover:scale-110 transition border border-white/10"></button>
+                            <button onclick="setQuickColor('#10b981')" class="w-6 h-6 rounded-md bg-emerald-500 hover:scale-110 transition border border-white/10"></button>
+                        </div>
+                    </div>
+
+                    <!-- Roughness Slider -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[11px]">
+                            <span class="text-slate-400">Kekasaran (Roughness)</span>
+                            <span id="val-roughness" class="mono text-slate-300">0.4</span>
+                        </div>
+                        <input id="mat-roughness" type="range" min="0" max="1" step="0.05" value="0.4" oninput="updateMaterialFromInput()" class="w-full">
+                    </div>
+
+                    <!-- Metalness Slider -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[11px]">
+                            <span class="text-slate-400">Efek Logam (Metalness)</span>
+                            <span id="val-metalness" class="mono text-slate-300">0.2</span>
+                        </div>
+                        <input id="mat-metalness" type="range" min="0" max="1" step="0.05" value="0.2" oninput="updateMaterialFromInput()" class="w-full">
+                    </div>
+
+                    <!-- Emissive / Glow Color -->
+                    <div class="flex items-center justify-between pt-1">
+                        <label class="text-[11px] text-slate-400">Cahaya Neon (Emissive)</label>
+                        <div class="flex items-center gap-2">
+                            <input id="mat-emissive" type="color" value="#000000" oninput="updateMaterialFromInput()" class="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0">
+                            <button onclick="clearEmissive()" class="text-[10px] px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-300">Matikan</button>
+                        </div>
+                    </div>
+
+                    <!-- Flat Shading Toggle -->
+                    <div class="flex items-center justify-between pt-1">
+                        <span class="text-[11px] text-slate-400">Gaya Low-Poly (Flat Shading)</span>
+                        <input id="mat-flat" type="checkbox" checked onchange="updateMaterialFromInput()" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lighting & Environment Settings -->
+            <div class="p-3.5 border-t border-slate-800 bg-slate-900/50 space-y-2.5 mt-auto">
+                <span class="text-xs font-semibold text-slate-300 block flex items-center gap-1.5">
+                    <i class="fa-solid fa-sun text-amber-400"></i> Pencahayaan Studio
+                </span>
+                <div class="flex items-center justify-between text-[11px]">
+                    <span class="text-slate-400">Intensitas Cahaya</span>
+                    <input id="env-light" type="range" min="0.2" max="2.5" step="0.1" value="1.2" oninput="updateEnvironmentLight(this.value)" class="w-28">
+                </div>
+                <div class="flex items-center justify-between text-[11px]">
+                    <span class="text-slate-400">Tampilkan Grid Lantai</span>
+                    <input id="env-grid" type="checkbox" checked onchange="toggleGrid(this.checked)" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Custom Confirmation Modal (No alert/confirm used) -->
+    <div id="custom-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-sm w-full p-5 shadow-2xl transform transition-all">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div>
+                    <h3 id="modal-title" class="text-sm font-bold text-white">Bersihkan Kanvas?</h3>
+                    <p id="modal-desc" class="text-xs text-slate-400 mt-0.5">Semua bagian aset 3D yang belum diekspor akan dihapus.</p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-5">
+                <button onclick="closeModal()" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition">Batal</button>
+                <button id="modal-confirm-btn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition">Ya, Bersihkan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 border border-cyan-500/40 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-medium transform translate-y-20 opacity-0 transition-all duration-300 z-50 pointer-events-none">
+        <i class="fa-solid fa-circle-check text-cyan-400 text-sm"></i>
+        <span id="toast-msg">Aset berhasil diekspor!</span>
+    </div>
+
+    <script>
+        // --- Global State Variables ---
+        let scene, camera, renderer, orbitControls, transformControls;
+        let assetGroup; // Parent group holding all user-created mesh parts
+        let gridHelper, dirLight, ambientLight;
+        let objects = []; // Array of mesh parts in the current asset
+        let selectedObject = null;
+        let selectionBox = null;
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let isDraggingTransform = false;
+        let snapEnabled = false;
+        let globalWireframe = false;
+        let previewAnimMode = 'none';
+        let clock = new THREE.Clock();
+
+        // Initialize Studio on Window Load
+        window.onload = function () {
+            initThreeJS();
+            loadPreset('sword'); // Load an awesome default game asset on start
+            setupEventListeners();
+            animate();
+        };
+
+        function initThreeJS() {
+            const container = document.getElementById('canvas-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            // 1. Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0b0f19);
+            scene.fog = new THREE.FogExp2(0x0b0f19, 0.025);
+
+            // 2. Camera Setup
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            camera.position.set(6, 5, 8);
+
+            // 3. Renderer Setup
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // 4. Lighting Setup
+            ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            dirLight.position.set(10, 18, 12);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 50;
+            scene.add(dirLight);
+
+            const backLight = new THREE.DirectionalLight(0x38bdf8, 0.4);
+            backLight.position.set(-10, -5, -10);
+            scene.add(backLight);
+
+            // 5. Grid & Floor Setup
+            gridHelper = new THREE.GridHelper(20, 20, 0x38bdf8, 0x1e293b);
+            gridHelper.position.y = -0.01;
+            scene.add(gridHelper);
+
+            // 6. Asset Group (Holds all parts of the 3D asset)
+            assetGroup = new THREE.Group();
+            scene.add(assetGroup);
+
+            // 7. Selection Box Helper
+            selectionBox = new THREE.BoxHelper(new THREE.Mesh(), 0x38bdf8);
+            selectionBox.material.depthTest = false;
+            selectionBox.material.transparent = true;
+            selectionBox.visible = false;
+            scene.add(selectionBox);
+
+            // 8. Orbit Controls
+            orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+            orbitControls.enableDamping = true;
+            orbitControls.dampingFactor = 0.08;
+            orbitControls.target.set(0, 1.5, 0);
+
+            // 9. Transform Controls (Gizmo)
+            transformControls = new THREE.TransformControls(camera, renderer.domElement);
+            transformControls.addEventListener('dragging-changed', function (event) {
+                orbitControls.enabled = !event.value;
+                isDraggingTransform = event.value;
+            });
+            transformControls.addEventListener('change', function () {
+                if (selectedObject) {
+                    selectionBox.update();
+                    syncInspectorInputs();
+                }
+            });
+            scene.add(transformControls);
+        }
+
+        // --- Primitive Creation ---
+        function createGeometry(type) {
+            switch (type) {
+                case 'box':
+                    return new THREE.BoxGeometry(1, 1, 1);
+                case 'sphere':
+                    return new THREE.SphereGeometry(0.6, 16, 12);
+                case 'cylinder':
+                    return new THREE.CylinderGeometry(0.5, 0.5, 1.2, 16);
+                case 'cone':
+                    return new THREE.ConeGeometry(0.6, 1.3, 16);
+                case 'torus':
+                    return new THREE.TorusGeometry(0.5, 0.18, 12, 24);
+                case 'octahedron':
+                    return new THREE.OctahedronGeometry(0.7, 0);
+                default:
+                    return new THREE.BoxGeometry(1, 1, 1);
+            }
+        }
+
+        function addPrimitive(type, customParams = {}) {
+            if (previewAnimMode !== 'none') setPreviewAnimation('none');
+
+            const geom = createGeometry(type);
+            const color = customParams.color || '#38bdf8';
+            const mat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(color),
+                roughness: customParams.roughness !== undefined ? customParams.roughness : 0.4,
+                metalness: customParams.metalness !== undefined ? customParams.metalness : 0.2,
+                emissive: new THREE.Color(customParams.emissive || '#000000'),
+                flatShading: customParams.flatShading !== undefined ? customParams.flatShading : true,
+                wireframe: globalWireframe
+            });
+
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+
+            // Naming
+            const typeNames = {
+                box: 'Kubus',
+                sphere: 'Bola',
+                cylinder: 'Silinder',
+                cone: 'Kerucut',
+                torus: 'Cincin',
+                octahedron: 'Kristal'
+            };
+            mesh.name = customParams.name || `${typeNames[type] || 'Bagian'}_${objects.length + 1}`;
+            mesh.userData.primitiveType = type;
+
+            // Default or custom transforms
+            if (customParams.position) {
+                mesh.position.fromArray(customParams.position);
+            } else {
+                mesh.position.set(0, 0.6, 0);
+            }
+
+            if (customParams.rotation) {
+                mesh.rotation.set(
+                    THREE.MathUtils.degToRad(customParams.rotation[0]),
+                    THREE.MathUtils.degToRad(customParams.rotation[1]),
+                    THREE.MathUtils.degToRad(customParams.rotation[2])
+                );
+            }
+
+            if (customParams.scale) {
+                mesh.scale.fromArray(customParams.scale);
+            }
+
+            assetGroup.add(mesh);
+            objects.push(mesh);
+
+            selectObject(mesh);
+            updateHierarchyUI();
+            updateStatsUI();
+
+            if (!customParams.silent) {
+                showToast(`${mesh.name} ditambahkan`);
+            }
+            return mesh;
+        }
+
+        // --- Game Asset Presets ---
+        function loadPreset(presetName) {
+            if (previewAnimMode !== 'none') setPreviewAnimation('none');
+            clearSceneInternal();
+
+            if (presetName === 'sword') {
+                // Pommel
+                addPrimitive('octahedron', { name: 'Permata_Gagang', position: [0, 0.3, 0], scale: [0.35, 0.35, 0.35], color: '#eab308', metalness: 0.8, roughness: 0.2, silent: true });
+                // Grip
+                addPrimitive('cylinder', { name: 'Pegangan', position: [0, 0.9, 0], scale: [0.22, 0.8, 0.22], color: '#7f1d1d', roughness: 0.8, metalness: 0.1, silent: true });
+                // Crossguard Center
+                addPrimitive('box', { name: 'Pelindung_Tengah', position: [0, 1.45, 0], scale: [1.4, 0.22, 0.35], color: '#f59e0b', metalness: 0.7, roughness: 0.3, silent: true });
+                // Gem in Crossguard
+                addPrimitive('octahedron', { name: 'Inti_Sihir', position: [0, 1.45, 0], scale: [0.25, 0.25, 0.35], color: '#06b6d4', emissive: '#0284c7', silent: true });
+                // Main Blade
+                addPrimitive('box', { name: 'Bilah_Utama', position: [0, 2.8, 0], scale: [0.38, 2.5, 0.1], color: '#e2e8f0', metalness: 0.85, roughness: 0.15, silent: true });
+                // Blade Tip
+                addPrimitive('cone', { name: 'Ujung_Pedang', position: [0, 4.4, 0], rotation: [0, 45, 0], scale: [0.45, 0.7, 0.12], color: '#e2e8f0', metalness: 0.85, roughness: 0.15, silent: true });
+                showToast('Template "Pedang Ksatria" dimuat');
+            } 
+            else if (presetName === 'tree') {
+                // Trunk
+                addPrimitive('cylinder', { name: 'Batang_Kayu', position: [0, 0.8, 0], scale: [0.45, 1.4, 0.45], color: '#5c4033', roughness: 0.9, metalness: 0, silent: true });
+                // Leaves Bottom
+                addPrimitive('cone', { name: 'Daun_Bawah', position: [0, 1.9, 0], scale: [1.8, 1.4, 1.8], color: '#15803d', roughness: 0.7, metalness: 0, silent: true });
+                // Leaves Middle
+                addPrimitive('cone', { name: 'Daun_Tengah', position: [0, 2.8, 0], scale: [1.4, 1.3, 1.4], color: '#16a34a', roughness: 0.7, metalness: 0, silent: true });
+                // Leaves Top
+                addPrimitive('cone', { name: 'Pucuk_Daun', position: [0, 3.6, 0], scale: [0.95, 1.1, 0.95], color: '#22c55e', roughness: 0.7, metalness: 0, silent: true });
+                showToast('Template "Pohon Pinus Low-Poly" dimuat');
+            }
+            else if (presetName === 'robot') {
+                // Legs
+                addPrimitive('box', { name: 'Kaki_Kiri', position: [-0.35, 0.45, 0], scale: [0.3, 0.9, 0.35], color: '#475569', metalness: 0.6, silent: true });
+                addPrimitive('box', { name: 'Kaki_Kanan', position: [0.35, 0.45, 0], scale: [0.3, 0.9, 0.35], color: '#475569', metalness: 0.6, silent: true });
+                // Torso
+                addPrimitive('box', { name: 'Badan_Bot', position: [0, 1.45, 0], scale: [1.2, 1.2, 0.75], color: '#0284c7', metalness: 0.5, roughness: 0.3, silent: true });
+                // Chest Core
+                addPrimitive('cylinder', { name: 'Reaktor_Dada', position: [0, 1.5, 0.38], rotation: [90, 0, 0], scale: [0.4, 0.1, 0.4], color: '#38bdf8', emissive: '#0284c7', silent: true });
+                // Head
+                addPrimitive('box', { name: 'Kepala_Bot', position: [0, 2.45, 0], scale: [0.9, 0.7, 0.7], color: '#94a3b8', metalness: 0.7, silent: true });
+                // Visor Eye
+                addPrimitive('box', { name: 'Visor_Mata', position: [0, 2.48, 0.33], scale: [0.7, 0.22, 0.1], color: '#22d3ee', emissive: '#06b6d4', silent: true });
+                // Antenna
+                addPrimitive('cylinder', { name: 'Antena', position: [0, 2.95, 0], scale: [0.08, 0.4, 0.08], color: '#cbd5e1', silent: true });
+                addPrimitive('sphere', { name: 'Ujung_Antena', position: [0, 3.2, 0], scale: [0.22, 0.22, 0.22], color: '#ef4444', emissive: '#991b1b', silent: true });
+                // Arms
+                addPrimitive('box', { name: 'Lengan_Kiri', position: [-0.8, 1.4, 0], scale: [0.28, 0.95, 0.3], color: '#64748b', silent: true });
+                addPrimitive('box', { name: 'Lengan_Kanan', position: [0.8, 1.4, 0], scale: [0.28, 0.95, 0.3], color: '#64748b', silent: true });
+                showToast('Template "Bot Karakter" dimuat');
+            }
+            else if (presetName === 'chest') {
+                // Base Box
+                addPrimitive('box', { name: 'Kotak_Bawah', position: [0, 0.55, 0], scale: [1.8, 1.1, 1.2], color: '#78350f', roughness: 0.8, metalness: 0.1, silent: true });
+                // Top Lid (Cylinder)
+                addPrimitive('cylinder', { name: 'Tutup_Atas', position: [0, 1.1, 0], rotation: [0, 0, 90], scale: [0.6, 1.48, 0.6], color: '#92400e', roughness: 0.7, silent: true });
+                // Gold Trim Left & Right
+                addPrimitive('box', { name: 'Sabuk_Emas_Kiri', position: [-0.65, 0.65, 0], scale: [0.18, 1.3, 1.26], color: '#eab308', metalness: 0.8, roughness: 0.25, silent: true });
+                addPrimitive('box', { name: 'Sabuk_Emas_Kanan', position: [0.65, 0.65, 0], scale: [0.18, 1.3, 1.26], color: '#eab308', metalness: 0.8, roughness: 0.25, silent: true });
+                // Lock
+                addPrimitive('box', { name: 'Gembok_Tengah', position: [0, 0.95, 0.62], scale: [0.35, 0.45, 0.15], color: '#facc15', metalness: 0.9, roughness: 0.15, silent: true });
+                showToast('Template "Peti Harta" dimuat');
+            }
+            else if (presetName === 'potion') {
+                // Bottle Body
+                addPrimitive('octahedron', { name: 'Kaca_Botol', position: [0, 0.85, 0], scale: [1.2, 1.2, 1.2], color: '#f43f5e', roughness: 0.15, metalness: 0.1, emissive: '#881337', silent: true });
+                // Neck
+                addPrimitive('cylinder', { name: 'Leher_Botol', position: [0, 1.65, 0], scale: [0.35, 0.5, 0.35], color: '#e2e8f0', roughness: 0.1, metalness: 0.3, silent: true });
+                // Rim
+                addPrimitive('torus', { name: 'Bibir_Botol', position: [0, 1.9, 0], rotation: [90, 0, 0], scale: [0.42, 0.42, 0.42], color: '#facc15', metalness: 0.8, silent: true });
+                // Cork
+                addPrimitive('cylinder', { name: 'Gabus_Penutup', position: [0, 2.08, 0], scale: [0.3, 0.35, 0.3], color: '#a16207', roughness: 0.9, silent: true });
+                showToast('Template "Ramuan HP" dimuat');
+            }
+            else if (presetName === 'spaceship') {
+                // Main Fuselage
+                addPrimitive('cone', { name: 'Bodi_Utama', position: [0, 1.0, 0.2], rotation: [90, 0, 0], scale: [0.9, 2.2, 0.5], color: '#e2e8f0', metalness: 0.6, roughness: 0.3, silent: true });
+                // Cockpit Glass
+                addPrimitive('sphere', { name: 'Kaca_Kokpit', position: [0, 1.2, 0.3], scale: [0.45, 0.35, 0.8], color: '#38bdf8', emissive: '#0369a1', roughness: 0.1, silent: true });
+                // Wings
+                addPrimitive('box', { name: 'Sayap_Utama', position: [0, 0.95, -0.3], scale: [3.0, 0.12, 1.1], color: '#3b82f6', metalness: 0.5, silent: true });
+                // Thrusters
+                addPrimitive('cylinder', { name: 'Mesin_Kiri', position: [-0.6, 0.95, -1.0], rotation: [90, 0, 0], scale: [0.35, 0.5, 0.35], color: '#334155', metalness: 0.8, silent: true });
+                addPrimitive('cylinder', { name: 'Mesin_Kanan', position: [0.6, 0.95, -1.0], rotation: [90, 0, 0], scale: [0.35, 0.5, 0.35], color: '#334155', metalness: 0.8, silent: true });
+                // Thruster Glow
+                addPrimitive('sphere', { name: 'Api_Kiri', position: [-0.6, 0.95, -1.3], scale: [0.28, 0.28, 0.28], color: '#f97316', emissive: '#ea580c', silent: true });
+                addPrimitive('sphere', { name: 'Api_Kanan', position: [0.6, 0.95, -1.3], scale: [0.28, 0.28, 0.28], color: '#f97316', emissive: '#ea580c', silent: true });
+                showToast('Template "Pesawat Sci-Fi" dimuat');
+            }
+        }
+
+        // --- AI 3D Character & Asset Generator (Gemini API) ---
+        function setAIPrompt(text) {
+            const promptEl = document.getElementById('ai-prompt');
+            promptEl.value = text;
+            promptEl.focus();
+        }
+
+        async function fetchWithRetry(url, options, maxRetries = 4) {
+            let delay = 1000;
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.ok) return response;
+                    if (response.status !== 429 && response.status < 500) {
+                        throw new Error(`HTTP Error: ${response.status}`);
+                    }
+                } catch (err) {
+                    if (attempt === maxRetries - 1) throw err;
+                }
+                await new Promise(res => setTimeout(res, delay));
+                delay *= 2;
+            }
+            throw new Error('Gagal menghubungi server AI setelah beberapa percobaan.');
+        }
+
+        async function generateWithAI() {
+            const promptInput = document.getElementById('ai-prompt');
+            const userPrompt = promptInput.value.trim();
+
+            if (!userPrompt) {
+                showToast('Ketik deskripsi karakter atau aset terlebih dahulu!');
+                promptInput.focus();
+                return;
+            }
+
+            const btn = document.getElementById('btn-ai-generate');
+            const btnIcon = document.getElementById('ai-btn-icon');
+            const btnText = document.getElementById('ai-btn-text');
+            const overlay = document.getElementById('ai-loading-overlay');
+            const clearExisting = document.getElementById('ai-clear-existing').checked;
+
+            // Set Loading UI State
+            btn.disabled = true;
+            btnIcon.className = 'fa-solid fa-circle-notch fa-spin';
+            btnText.textContent = 'Merakit 3D...';
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            const systemInstruction = `Anda adalah desainer karakter dan aset gim 3D low-poly profesional.
+Tugas Anda adalah menerjemahkan deskripsi pengguna menjadi kumpulan bagian 3D (primitives) yang tersusun rapi dan proporsional membentuk karakter atau objek yang diminta.
+
+Aturan Geometri Dasar (Ukuran Default sebelum di-scale):
+- "box": ukuran lebar 1, tinggi 1, tebal 1
+- "sphere": radius 0.6 (diameter 1.2)
+- "cylinder": radius 0.5, tinggi 1.2
+- "cone": radius alas 0.6, tinggi 1.3
+- "torus": radius utama 0.5, radius tabung 0.18
+- "octahedron": ukuran berlian/kristal radius 0.7
+
+Panduan Perakitan Karakter / Objek:
+1. Lantai berada pada Y = 0. Pastikan bagian paling bawah (misal kaki/alas) menyentuh lantai (Y >= 0.3) dan tersusun ke atas (biasanya tinggi total antara Y = 0 hingga Y = 4.0).
+2. Pusat karakter berada di X = 0, Z = 0. Wajah/bagian depan menghadap ke arah Z positif (+Z).
+3. Untuk karakter (manusia, ksatria, monster, robot, hewan), buat anatomi yang jelas dan menarik: kepala, mata (gunakan warna menyala/kontras di +Z), badan/torso, kaki kiri (-X) & kanan (+X), lengan kiri (-X) & kanan (+X), serta aksesoris khas sesuai permintaan (topi, mahkota, tanduk, jubah, senjata di tangan, perisai, sayap, ekor, dll).
+4. Gunakan antara 8 hingga 24 bagian (parts) agar bentuk karakter terlihat detail, ekspresif, dan mudah dikenali.
+5. Gunakan warna hex (#RRGGBB) yang harmonis, metalness (0.0 - 1.0), roughness (0.0 - 1.0), dan emissive (#RRGGBB, gunakan #000000 jika tidak bercahaya) untuk bagian yang bersinar seperti mata sihir, inti energi, atau pedang neon.`;
+
+            const payload = {
+                contents: [{
+                    role: "user",
+                    parts: [{ text: `Buat model 3D low-poly untuk: ${userPrompt}` }]
+                }],
+                systemInstruction: {
+                    parts: [{ text: systemInstruction }]
+                },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            assetTitle: { type: "STRING" },
+                            parts: {
+                                type: "ARRAY",
+                                items: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        name: { type: "STRING" },
+                                        type: {
+                                            type: "STRING",
+                                            enum: ["box", "sphere", "cylinder", "cone", "torus", "octahedron"]
+                                        },
+                                        position: {
+                                            type: "ARRAY",
+                                            items: { type: "NUMBER" }
+                                        },
+                                        rotation: {
+                                            type: "ARRAY",
+                                            items: { type: "NUMBER" }
+                                        },
+                                        scale: {
+                                            type: "ARRAY",
+                                            items: { type: "NUMBER" }
+                                        },
+                                        color: { type: "STRING" },
+                                        roughness: { type: "NUMBER" },
+                                        metalness: { type: "NUMBER" },
+                                        emissive: { type: "STRING" }
+                                    },
+                                    required: ["name", "type", "position", "rotation", "scale", "color"]
+                                }
+                            }
+                        },
+                        required: ["assetTitle", "parts"]
+                    }
+                }
+            };
+
+            try {
+                const response = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                const jsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (!jsonText) {
+                    throw new Error('Respons AI kosong');
+                }
+
+                const parsed = JSON.parse(jsonText);
+                if (!parsed.parts || !Array.isArray(parsed.parts) || parsed.parts.length === 0) {
+                    throw new Error('Format bagian 3D tidak ditemukan');
+                }
+
+                if (previewAnimMode !== 'none') setPreviewAnimation('none');
+                if (clearExisting) {
+                    clearSceneInternal();
+                }
+
+                let lastCreated = null;
+                parsed.parts.forEach((p, idx) => {
+                    const safeType = ['box', 'sphere', 'cylinder', 'cone', 'torus', 'octahedron'].includes(p.type) ? p.type : 'box';
+                    const pos = Array.isArray(p.position) && p.position.length === 3 ? p.position : [0, 1, 0];
+                    const rot = Array.isArray(p.rotation) && p.rotation.length === 3 ? p.rotation : [0, 0, 0];
+                    const scl = Array.isArray(p.scale) && p.scale.length === 3 ? p.scale.map(v => Math.max(0.05, v)) : [1, 1, 1];
+                    const col = /^#[0-9A-Fa-f]{6}$/.test(p.color) ? p.color : '#38bdf8';
+                    const emi = /^#[0-9A-Fa-f]{6}$/.test(p.emissive) ? p.emissive : '#000000';
+
+                    lastCreated = addPrimitive(safeType, {
+                        name: (p.name || `Bagian_${idx + 1}`).replace(/\s+/g, '_'),
+                        position: pos,
+                        rotation: rot,
+                        scale: scl,
+                        color: col,
+                        roughness: typeof p.roughness === 'number' ? Math.min(1, Math.max(0, p.roughness)) : 0.4,
+                        metalness: typeof p.metalness === 'number' ? Math.min(1, Math.max(0, p.metalness)) : 0.2,
+                        emissive: emi,
+                        silent: true
+                    });
+                });
+
+                if (lastCreated) {
+                    selectObject(lastCreated);
+                }
+                showToast(`"${parsed.assetTitle || 'Karakter AI'}" (${parsed.parts.length} bagian) berhasil dibuat!`);
+            } catch (error) {
+                console.error(error);
+                showToast('Gagal membuat aset AI. Silakan coba lagi.');
+            } finally {
+                btn.disabled = false;
+                btnIcon.className = 'fa-solid fa-bolt';
+                btnText.textContent = 'Buat Karakter / Aset AI';
+                overlay.classList.add('hidden');
+                overlay.classList.remove('flex');
+            }
+        }
+
+        // --- Object Selection & Management ---
+        function selectObject(obj) {
+            selectedObject = obj;
+            const emptyPanel = document.getElementById('inspector-empty');
+            const contentPanel = document.getElementById('inspector-content');
+            const badge = document.getElementById('selected-badge');
+
+            if (obj) {
+                transformControls.attach(obj);
+                selectionBox.setFromObject(obj);
+                selectionBox.visible = true;
+                emptyPanel.classList.add('hidden');
+                contentPanel.classList.remove('hidden');
+                badge.textContent = obj.userData.primitiveType ? obj.userData.primitiveType.toUpperCase() : 'MESH';
+                syncInspectorInputs();
+            } else {
+                transformControls.detach();
+                selectionBox.visible = false;
+                emptyPanel.classList.remove('hidden');
+                contentPanel.classList.add('hidden');
+                badge.textContent = 'Kosong';
+            }
+            updateHierarchyUI();
+        }
+
+        function syncInspectorInputs() {
+            if (!selectedObject) return;
+
+            document.getElementById('inp-name').value = selectedObject.name;
+
+            // Position
+            document.getElementById('pos-x').value = selectedObject.position.x.toFixed(2);
+            document.getElementById('pos-y').value = selectedObject.position.y.toFixed(2);
+            document.getElementById('pos-z').value = selectedObject.position.z.toFixed(2);
+
+            // Rotation (in degrees)
+            document.getElementById('rot-x').value = Math.round(THREE.MathUtils.radToDeg(selectedObject.rotation.x));
+            document.getElementById('rot-y').value = Math.round(THREE.MathUtils.radToDeg(selectedObject.rotation.y));
+            document.getElementById('rot-z').value = Math.round(THREE.MathUtils.radToDeg(selectedObject.rotation.z));
+
+            // Scale
+            document.getElementById('scl-x').value = selectedObject.scale.x.toFixed(2);
+            document.getElementById('scl-y').value = selectedObject.scale.y.toFixed(2);
+            document.getElementById('scl-z').value = selectedObject.scale.z.toFixed(2);
+
+            // Material
+            const mat = selectedObject.material;
+            if (mat) {
+                const hex = '#' + mat.color.getHexString();
+                document.getElementById('mat-color').value = hex;
+                document.getElementById('mat-color-hex').textContent = hex.toUpperCase();
+
+                document.getElementById('mat-roughness').value = mat.roughness;
+                document.getElementById('val-roughness').textContent = mat.roughness.toFixed(2);
+
+                document.getElementById('mat-metalness').value = mat.metalness;
+                document.getElementById('val-metalness').textContent = mat.metalness.toFixed(2);
+
+                const emHex = '#' + mat.emissive.getHexString();
+                document.getElementById('mat-emissive').value = emHex;
+
+                document.getElementById('mat-flat').checked = mat.flatShading;
+            }
+        }
+
+        function updateTransformFromInput() {
+            if (!selectedObject) return;
+
+            const px = parseFloat(document.getElementById('pos-x').value) || 0;
+            const py = parseFloat(document.getElementById('pos-y').value) || 0;
+            const pz = parseFloat(document.getElementById('pos-z').value) || 0;
+            selectedObject.position.set(px, py, pz);
+
+            const rx = parseFloat(document.getElementById('rot-x').value) || 0;
+            const ry = parseFloat(document.getElementById('rot-y').value) || 0;
+            const rz = parseFloat(document.getElementById('rot-z').value) || 0;
+            selectedObject.rotation.set(
+                THREE.MathUtils.degToRad(rx),
+                THREE.MathUtils.degToRad(ry),
+                THREE.MathUtils.degToRad(rz)
+            );
+
+            const sx = Math.max(0.05, parseFloat(document.getElementById('scl-x').value) || 1);
+            const sy = Math.max(0.05, parseFloat(document.getElementById('scl-y').value) || 1);
+            const sz = Math.max(0.05, parseFloat(document.getElementById('scl-z').value) || 1);
+            selectedObject.scale.set(sx, sy, sz);
+
+            selectionBox.update();
+        }
+
+        function updateMaterialFromInput() {
+            if (!selectedObject || !selectedObject.material) return;
+            const mat = selectedObject.material;
+
+            const colorVal = document.getElementById('mat-color').value;
+            mat.color.set(colorVal);
+            document.getElementById('mat-color-hex').textContent = colorVal.toUpperCase();
+
+            const roughVal = parseFloat(document.getElementById('mat-roughness').value);
+            mat.roughness = roughVal;
+            document.getElementById('val-roughness').textContent = roughVal.toFixed(2);
+
+            const metalVal = parseFloat(document.getElementById('mat-metalness').value);
+            mat.metalness = metalVal;
+            document.getElementById('val-metalness').textContent = metalVal.toFixed(2);
+
+            const emissiveVal = document.getElementById('mat-emissive').value;
+            mat.emissive.set(emissiveVal);
+
+            const flatVal = document.getElementById('mat-flat').checked;
+            if (mat.flatShading !== flatVal) {
+                mat.flatShading = flatVal;
+                mat.needsUpdate = true;
+            }
+            updateHierarchyUI();
+        }
+
+        function setQuickColor(hex) {
+            if (!selectedObject) return;
+            document.getElementById('mat-color').value = hex;
+            updateMaterialFromInput();
+        }
+
+        function clearEmissive() {
+            if (!selectedObject) return;
+            document.getElementById('mat-emissive').value = '#000000';
+            updateMaterialFromInput();
+        }
+
+        function updateObjectName(newName) {
+            if (!selectedObject) return;
+            selectedObject.name = newName.trim() || 'Bagian_Tanpa_Nama';
+            updateHierarchyUI();
+        }
+
+        function resetSelectedTransform() {
+            if (!selectedObject) return;
+            selectedObject.position.set(0, 0.6, 0);
+            selectedObject.rotation.set(0, 0, 0);
+            selectedObject.scale.set(1, 1, 1);
+            selectionBox.update();
+            syncInspectorInputs();
+        }
+
+        function duplicateSelected() {
+            if (!selectedObject) return;
+            const orig = selectedObject;
+            const newMesh = addPrimitive(orig.userData.primitiveType || 'box', {
+                name: orig.name + '_Salinan',
+                position: [orig.position.x + 0.4, orig.position.y, orig.position.z + 0.4],
+                rotation: [
+                    THREE.MathUtils.radToDeg(orig.rotation.x),
+                    THREE.MathUtils.radToDeg(orig.rotation.y),
+                    THREE.MathUtils.radToDeg(orig.rotation.z)
+                ],
+                scale: [orig.scale.x, orig.scale.y, orig.scale.z],
+                color: '#' + orig.material.color.getHexString(),
+                roughness: orig.material.roughness,
+                metalness: orig.material.metalness,
+                emissive: '#' + orig.material.emissive.getHexString(),
+                flatShading: orig.material.flatShading,
+                silent: true
+            });
+            selectObject(newMesh);
+            showToast('Bagian berhasil diduplikat');
+        }
+
+        function deleteSelected() {
+            if (!selectedObject) return;
+            const toDelete = selectedObject;
+            selectObject(null);
+
+            assetGroup.remove(toDelete);
+            toDelete.geometry.dispose();
+            toDelete.material.dispose();
+
+            objects = objects.filter(o => o !== toDelete);
+            if (objects.length > 0) {
+                selectObject(objects[objects.length - 1]);
+            }
+            updateHierarchyUI();
+            updateStatsUI();
+            showToast('Bagian dihapus');
+        }
+
+        // --- UI Updates (Hierarchy & Stats) ---
+        function updateHierarchyUI() {
+            const listEl = document.getElementById('hierarchy-list');
+            document.getElementById('part-count').textContent = objects.length;
+            listEl.innerHTML = '';
+
+            if (objects.length === 0) {
+                listEl.innerHTML = `<div class="text-[11px] text-slate-500 text-center py-6">Belum ada bagian 3D</div>`;
+                return;
+            }
+
+            objects.forEach((obj) => {
+                const isSelected = obj === selectedObject;
+                const colorHex = '#' + obj.material.color.getHexString();
+                const item = document.createElement('div');
+                item.className = `flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition ${
+                    isSelected ? 'bg-cyan-500/20 text-white border border-cyan-500/40 font-medium' : 'text-slate-300 hover:bg-slate-800/80 border border-transparent'
+                }`;
+                item.onclick = () => selectObject(obj);
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2 truncate">
+                        <span class="w-3 h-3 rounded-full shrink-0 border border-white/20" style="background-color: ${colorHex}"></span>
+                        <span class="truncate">${obj.name}</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-[10px] ${isSelected ? 'text-cyan-400' : 'text-slate-600'}"></i>
+                `;
+                listEl.appendChild(item);
+            });
+        }
+
+        function updateStatsUI() {
+            let totalTris = 0;
+            let totalVerts = 0;
+
+            objects.forEach(obj => {
+                const geom = obj.geometry;
+                if (geom.index) {
+                    totalTris += geom.index.count / 3;
+                } else if (geom.attributes.position) {
+                    totalTris += geom.attributes.position.count / 3;
+                }
+                if (geom.attributes.position) {
+                    totalVerts += geom.attributes.position.count;
+                }
+            });
+
+            document.getElementById('stat-tris').textContent = Math.round(totalTris).toLocaleString('id-ID');
+            document.getElementById('stat-verts').textContent = Math.round(totalVerts).toLocaleString('id-ID');
+        }
+
+        // --- Toolbar & Camera Controls ---
+        function setTransformMode(mode) {
+            transformControls.setMode(mode);
+            ['translate', 'rotate', 'scale'].forEach(m => {
+                const btn = document.getElementById('btn-' + m);
+                if (m === mode) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+        }
+
+        function toggleSnap() {
+            snapEnabled = !snapEnabled;
+            const btn = document.getElementById('btn-snap');
+            if (snapEnabled) {
+                transformControls.setTranslationSnap(0.25);
+                transformControls.setRotationSnap(THREE.MathUtils.degToRad(15));
+                transformControls.setScaleSnap(0.1);
+                btn.classList.add('active');
+                showToast('Snap Grid Diaktifkan');
+            } else {
+                transformControls.setTranslationSnap(null);
+                transformControls.setRotationSnap(null);
+                transformControls.setScaleSnap(null);
+                btn.classList.remove('active');
+                showToast('Snap Grid Dimatikan');
+            }
+        }
+
+        function toggleGlobalWireframe() {
+            globalWireframe = !globalWireframe;
+            const btn = document.getElementById('btn-wireframe');
+            if (globalWireframe) btn.classList.add('active');
+            else btn.classList.remove('active');
+
+            objects.forEach(obj => {
+                if (obj.material) obj.material.wireframe = globalWireframe;
+            });
+        }
+
+        function setCameraView(view) {
+            orbitControls.target.set(0, 1.5, 0);
+            switch (view) {
+                case 'front':
+                    camera.position.set(0, 1.5, 9);
+                    break;
+                case 'side':
+                    camera.position.set(9, 1.5, 0);
+                    break;
+                case 'top':
+                    camera.position.set(0, 10, 0.01);
+                    break;
+                case 'iso':
+                default:
+                    camera.position.set(6, 5, 8);
+                    break;
+            }
+            orbitControls.update();
+        }
+
+        function setPreviewAnimation(mode) {
+            previewAnimMode = mode;
+            ['none', 'spin', 'float', 'bounce'].forEach(m => {
+                const btn = document.getElementById('anim-' + m);
+                if (m === mode) {
+                    btn.className = 'anim-btn active px-2.5 py-1 rounded-lg text-xs font-medium bg-cyan-600 text-white transition flex items-center gap-1';
+                } else {
+                    btn.className = 'anim-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 transition flex items-center gap-1';
+                }
+            });
+
+            if (mode === 'none') {
+                assetGroup.position.set(0, 0, 0);
+                assetGroup.rotation.set(0, 0, 0);
+                if (selectedObject) transformControls.attach(selectedObject);
+            } else {
+                transformControls.detach();
+            }
+        }
+
+        function updateEnvironmentLight(val) {
+            dirLight.intensity = parseFloat(val);
+        }
+
+        function toggleGrid(visible) {
+            gridHelper.visible = visible;
+        }
+
+        // --- Exporters (.OBJ and .JSON) ---
+        function exportOBJ() {
+            if (objects.length === 0) {
+                showToast('Kanvas masih kosong!');
+                return;
+            }
+
+            let objContent = `# PolyForge 3D Game Asset Studio Export\n# Total Bagian: ${objects.length}\n\n`;
+            let vertexOffset = 1;
+
+            // Ensure world matrices are updated before exporting
+            assetGroup.updateMatrixWorld(true);
+
+            objects.forEach((mesh, idx) => {
+                const name = mesh.name.replace(/\s+/g, '_') || `Mesh_${idx}`;
+                objContent += `o ${name}\n`;
+
+                const geom = mesh.geometry.clone();
+                geom.applyMatrix4(mesh.matrixWorld);
+
+                const posAttr = geom.attributes.position;
+                const normAttr = geom.attributes.normal;
+
+                // Write Vertices
+                for (let i = 0; i < posAttr.count; i++) {
+                    const vx = posAttr.getX(i).toFixed(4);
+                    const vy = posAttr.getY(i).toFixed(4);
+                    const vz = posAttr.getZ(i).toFixed(4);
+                    objContent += `v ${vx} ${vy} ${vz}\n`;
+                }
+
+                // Write Normals
+                if (normAttr) {
+                    for (let i = 0; i < normAttr.count; i++) {
+                        const nx = normAttr.getX(i).toFixed(4);
+                        const ny = normAttr.getY(i).toFixed(4);
+                        const nz = normAttr.getZ(i).toFixed(4);
+                        objContent += `vn ${nx} ${ny} ${nz}\n`;
+                    }
+                }
+
+                // Write Faces
+                const indices = geom.index ? geom.index.array : null;
+                if (indices) {
+                    for (let i = 0; i < indices.length; i += 3) {
+                        const a = indices[i] + vertexOffset;
+                        const b = indices[i + 1] + vertexOffset;
+                        const c = indices[i + 2] + vertexOffset;
+                        objContent += `f ${a}//${a} ${b}//${b} ${c}//${c}\n`;
+                    }
+                } else {
+                    for (let i = 0; i < posAttr.count; i += 3) {
+                        const a = i + vertexOffset;
+                        const b = i + 1 + vertexOffset;
+                        const c = i + 2 + vertexOffset;
+                        objContent += `f ${a}//${a} ${b}//${b} ${c}//${c}\n`;
+                    }
+                }
+
+                objContent += `\n`;
+                vertexOffset += posAttr.count;
+            });
+
+            downloadFile(objContent, 'aset_gim_3d.obj', 'text/plain');
+            showToast('Aset berhasil diekspor ke .OBJ!');
+        }
+
+        function exportJSON() {
+            if (objects.length === 0) {
+                showToast('Kanvas masih kosong!');
+                return;
+            }
+
+            const data = {
+                studio: "PolyForge 3D Game Asset Studio",
+                exportedAt: new Date().toISOString(),
+                parts: objects.map(obj => ({
+                    name: obj.name,
+                    type: obj.userData.primitiveType || 'box',
+                    position: obj.position.toArray(),
+                    rotation: [
+                        THREE.MathUtils.radToDeg(obj.rotation.x),
+                        THREE.MathUtils.radToDeg(obj.rotation.y),
+                        THREE.MathUtils.radToDeg(obj.rotation.z)
+                    ],
+                    scale: obj.scale.toArray(),
+                    material: {
+                        color: '#' + obj.material.color.getHexString(),
+                        roughness: obj.material.roughness,
+                        metalness: obj.material.metalness,
+                        emissive: '#' + obj.material.emissive.getHexString(),
+                        flatShading: obj.material.flatShading
+                    }
+                }))
+            };
+
+            const jsonStr = JSON.stringify(data, null, 2);
+            downloadFile(jsonStr, 'proyek_aset_3d.json', 'application/json');
+            showToast('Data proyek disimpan ke .JSON!');
+        }
+
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // --- Clear Scene & Modal ---
+        function clearSceneInternal() {
+            selectObject(null);
+            objects.forEach(obj => {
+                assetGroup.remove(obj);
+                obj.geometry.dispose();
+                obj.material.dispose();
+            });
+            objects = [];
+            updateHierarchyUI();
+            updateStatsUI();
+        }
+
+        function clearSceneConfirm() {
+            const modal = document.getElementById('custom-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.getElementById('modal-confirm-btn').onclick = () => {
+                clearSceneInternal();
+                closeModal();
+                showToast('Kanvas dibersihkan');
+            };
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('custom-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            clearTimeout(toast.timeoutId);
+            toast.timeoutId = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2600);
+        }
+
+        // --- Event Listeners (Raycasting, Resize, Shortcuts) ---
+        function setupEventListeners() {
+            const container = document.getElementById('canvas-container');
+            let downPos = { x: 0, y: 0 };
+
+            container.addEventListener('pointerdown', (e) => {
+                downPos.x = e.clientX;
+                downPos.y = e.clientY;
+            });
+
+            container.addEventListener('pointerup', (e) => {
+                if (isDraggingTransform) return;
+                const dist = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+                if (dist > 5) return; // Was dragging camera, not clicking
+
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(objects, false);
+
+                if (intersects.length > 0) {
+                    selectObject(intersects[0].object);
+                } else {
+                    selectObject(null);
+                }
+            });
+
+            // Keyboard Shortcuts
+            window.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT') return;
+
+                const key = e.key.toLowerCase();
+                if (key === 'g' || key === 'w') setTransformMode('translate');
+                else if (key === 'r' || key === 'e') setTransformMode('rotate');
+                else if (key === 's') setTransformMode('scale');
+                else if (key === 'd') duplicateSelected();
+                else if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
+            });
+
+            // Responsive Resize
+            window.addEventListener('resize', () => {
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(width, height);
+            });
+        }
+
+        // --- Main Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const elapsedTime = clock.getElapsedTime();
+
+            // Game Animation Preview Modes
+            if (previewAnimMode === 'spin') {
+                assetGroup.rotation.y = elapsedTime * 1.5;
+                assetGroup.position.y = 0;
+            } else if (previewAnimMode === 'float') {
+                assetGroup.rotation.y = elapsedTime * 0.8;
+                assetGroup.position.y = Math.sin(elapsedTime * 2.5) * 0.35;
+            } else if (previewAnimMode === 'bounce') {
+                assetGroup.position.y = Math.abs(Math.sin(elapsedTime * 4.5)) * 0.8;
+                assetGroup.rotation.y = 0;
+            }
+
+            if (selectedObject && selectionBox.visible) {
+                selectionBox.update();
+            }
+
+            orbitControls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
